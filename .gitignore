@@ -132,3 +132,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# project specific
+Application

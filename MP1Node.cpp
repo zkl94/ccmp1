@@ -6,6 +6,8 @@
  **********************************/
 
 #include "MP1Node.h"
+#include <algorithm> // for remove_if
+#include <functional> // for unary_function
 
 /*
  * Note: You can change/add any functions in MP1Node.{h,cpp}
@@ -132,13 +134,15 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
         memberNode->inGroup = true;
     }
     else {
-        size_t msgsize = sizeof(MessageHdr) + sizeof(joinaddr->addr) + sizeof(long) + 1;
+        // size_t msgsize = sizeof(MessageHdr) + sizeof(joinaddr->addr) + sizeof(long) + 1;
+        size_t msgsize = sizeof(MessageHdr) + sizeof(joinaddr->addr) + sizeof(long);
         msg = (MessageHdr *) malloc(msgsize * sizeof(char));
 
         // create JOINREQ message: format of data is {struct Address myaddr}
         msg->msgType = JOINREQ;
         memcpy((char *)(msg+1), &memberNode->addr.addr, sizeof(memberNode->addr.addr));
-        memcpy((char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
+        // memcpy((char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
+        memcpy((char *)(msg+1) + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
 
 #ifdef DEBUGLOG
         sprintf(s, "Trying to join...");
@@ -222,12 +226,39 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 
     // for introduction:
     // two message types: JOINREQ, JOINREP
-    // when introducer receives JOINREQ, return JOINREP (cluster member list)
-    // when cluster member receives JOINREP, add the cluster member list
+    // 1. when introducer receives JOINREQ, return JOINREP (cluster member list)
+    // 2. when cluster member receives JOINREP, add the cluster member list
 
-    // 
+    // for membership:
+    // two message types: HEARTBEAT, ECHO, MEMBERLIST
+    // 1. when receive HEARTBEAT, send back ECHO
+    // 2. when receive ECHO, update member list entry for that node
+    // 3. when receive MEMBERLIST, update you own member list accordingly
+
 
 }
+
+#define HEARTBEAT_THRESHOLD 10
+
+// this is a single threaded application
+long node_heartbeat = 0;
+
+// check if the heartbeat is outdated
+bool isEntryInvalid(MemberListEntry& memberListEntry) {
+    long entry_heartbeat = memberListEntry.getheartbeat();
+    // some threahold
+    if (node_heartbeat - entry_heartbeat > HEARTBEAT_THRESHOLD) {
+        return true;
+    }
+    return false;
+}
+
+struct remove_entry : public std::unary_function<MemberListEntry&, bool> {
+    bool operator() (MemberListEntry& memberListEntry)
+    {
+        return isEntryInvalid(memberListEntry);
+    }
+};
 
 /**
  * FUNCTION NAME: nodeLoopOps
@@ -243,9 +274,63 @@ void MP1Node::nodeLoopOps() {
 	 */
 
     // first implement all to all heartbeat
-    // 1. send heartbeats to all other members (HEARTBEAT)
-    // 2. 
+    // 0. update self heartbeat
+    // 1. Check if any node hasn't responded within a timeout period and then delete the nodes
+    // 2. send heartbeats to all other members (HEARTBEAT)
+    // 3. Propagate your membership list to every other member (MEMBERLIST)
 
+    // update self heartbeat
+    memberNode->heartbeat++;
+    node_heartbeat = memberNode->heartbeat;
+
+    // Check if any node hasn't responded within a timeout period and then delete the nodes
+    getMemberNode()->memberList.erase(std::remove_if(getMemberNode()->memberList.begin(), getMemberNode()->memberList.end(), remove_entry()),
+                getMemberNode()->memberList.end());
+
+    // construct MEMBERLIST message
+    int entry_num = getMemberNode()->memberList.size();
+    int currentOffset = 0; 
+    // 6 for char addr[6]
+    size_t memberListMsgSize = sizeof(MessageHdr) + (6 + sizeof(long)) * entry_num;
+    MessageHdr *memberListMsg;
+    memberListMsg = (MessageHdr *) malloc(memberListMsgSize * sizeof(char));
+    memberListMsg->msgType = MEMBERLIST;
+    // for the message type offset
+    currentOffset += 1;
+
+    // construct HEARTBEAT message
+    MessageHdr *heartbeatMsg;
+    // 6 for char addr[6]
+    size_t heartbeatMsgSize = sizeof(MessageHdr) + 6 + sizeof(long);
+    heartbeatMsg = (MessageHdr *) malloc(heartbeatMsgSize * sizeof(char));
+
+    heartbeatMsg->msgType = HEARTBEAT;
+    memcpy((char *)(heartbeatMsg+1), &memberNode->addr.addr, sizeof(memberNode->addr.addr));
+    memcpy((char *)(heartbeatMsg+1) + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
+
+    // send / construct two kinds of messages
+    for (MemberListEntry memberListEntry: getMemberNode()->memberList) {
+        Address address;
+        // send heartbeats to all other members
+        string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
+        address = Address(_address);
+        emulNet->ENsend(&memberNode->addr, &address, (char *)heartbeatMsg, heartbeatMsgSize);
+
+        // add to MEMBERLIST
+        memcpy((char *)(memberListMsg+currentOffset), &address.addr, sizeof(address.addr));
+        currentOffset += sizeof(address.addr);
+        memcpy((char *)(heartbeatMsg+currentOffset), &memberListEntry.heartbeat, sizeof(long));
+        currentOffset += sizeof(long);
+    }
+    free(heartbeatMsg);
+
+    // Propagate your membership list
+    for (MemberListEntry memberListEntry: getMemberNode()->memberList) {
+        Address address;
+        string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
+        address = Address(_address);
+        emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, memberListMsgSize);
+    }
 
     return;
 }

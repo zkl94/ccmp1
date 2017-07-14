@@ -31,6 +31,9 @@
 enum MsgTypes{
     JOINREQ,
     JOINREP,
+    HEARTBEAT,
+    ECHO,
+    MEMBERLIST,
     DUMMYLASTMSGTYPE
 };
 
