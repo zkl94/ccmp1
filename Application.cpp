@@ -90,9 +90,7 @@ Application::~Application() {
 int Application::run()
 {
 	int i;
-	int timeWhenAllNodesHaveJoined = 0;
 	// boolean indicating if all nodes have joined
-	bool allNodesJoined = false;
 	srand(time(NULL));
 
 	// As time runs along
@@ -143,7 +141,7 @@ void Application::mp1Run() {
 		if( par->getcurrtime() == (int)(par->STEP_RATE*i) ) {
 			// introduce the ith node into the system at time STEPRATE*i
 			mp1[i]->nodeStart(JOINADDR, par->PORTNUM);
-			cout<<i<<"-th introduced node is assigned with the address: "<<mp1[i]->getMemberNode()->addr.getAddress() << endl;
+			// cout<<i<<"-th introduced node is assigned with the address: "<<mp1[i]->getMemberNode()->addr.getAddress() << endl;
 			nodeCount += i;
 		}
 

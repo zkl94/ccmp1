@@ -29,12 +29,11 @@
  * Message Types
  */
 enum MsgTypes{
-    JOINREQ,
-    JOINREP,
-    HEARTBEAT,
-    ECHO,
-    MEMBERLIST,
-    DUMMYLASTMSGTYPE
+    JOINREQ = 0,
+    JOINREP = 1,
+    HEARTBEAT = 2,
+    MEMBERLIST = 3,
+    DUMMYLASTMSGTYPE = 4
 };
 
 /**
@@ -79,6 +78,11 @@ public:
 	void initMemberListTable(Member *memberNode);
 	void printAddress(Address *addr);
 	virtual ~MP1Node();
+
+	void handleJOINREQ(void *env, char *data, int size);
+	void handleJOINREP(void *env, char *data, int size);
+	void handleHEARTBEAT(void *env, char *data, int size);
+	void handleMEMBERLIST(void *env, char *data, int size);
 };
 
 #endif /* _MP1NODE_H_ */
