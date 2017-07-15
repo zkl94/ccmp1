@@ -233,6 +233,13 @@ void MP1Node::checkMessages() {
     return;
 }
 
+void MP1Node::logNodeAddWrapper(Member *memberNode, int id, short port) {
+    Address address;
+    string _address = to_string(id) + ":" + to_string(port);
+    address = Address(_address);
+    log->logNodeAdd(&memberNode->addr, &address);
+}
+
 /**
  * FUNCTION NAME: recvCallBack
  *
@@ -310,6 +317,8 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
     MemberListEntry *newEntry = new MemberListEntry(id, port);
     memberNode->memberList.push_back(*newEntry);
 
+    logNodeAddWrapper(memberNode, id, port);
+
     #ifdef DEBUG_JOINREQ
         cout << "after adding member list entry, there are " << memberNode->memberList.size() << " entries" << endl;
     #endif
@@ -375,12 +384,14 @@ void MP1Node::handleJOINREP(void *env, char *data, int size) {
         // @TODO: timestamp may be needed
         MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, 0);
         memberNode->memberList.push_back(*newEntry);
+
+        logNodeAddWrapper(memberNode, id, port);
     }
 
     memberNode->inGroup = true;
 }
 
-void updateEntry(Member *memberNode, int id, short port, long heartbeat) {
+void MP1Node::updateEntry(Member *memberNode, int id, short port, long heartbeat) {
     bool found = false;
     for (MemberListEntry memberListEntry: memberNode->memberList) {
 
@@ -398,6 +409,8 @@ void updateEntry(Member *memberNode, int id, short port, long heartbeat) {
         // @TODO: timestamp may be needed
         MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, 0);
         memberNode->memberList.push_back(*newEntry);
+
+        logNodeAddWrapper(memberNode, id, port);
     }
 }
 
@@ -459,7 +472,7 @@ void MP1Node::handleMEMBERLIST(void *env, char *data, int size) {
 long node_heartbeat = 0;
 
 // check if the heartbeat is outdated
-bool isEntryInvalid(MemberListEntry& memberListEntry) {
+bool isEntryInvalid(Member *memberNode, MemberListEntry& memberListEntry) {
     // can't be based on
     long entry_heartbeat = memberListEntry.getheartbeat();
     // some threahold
@@ -469,12 +482,12 @@ bool isEntryInvalid(MemberListEntry& memberListEntry) {
     return false;
 }
 
-struct remove_entry : public std::unary_function<MemberListEntry&, bool> {
-    bool operator() (MemberListEntry& memberListEntry)
-    {
-        return isEntryInvalid(memberListEntry);
-    }
-};
+// struct remove_entry : public std::unary_function<MemberListEntry&, bool> {
+//     bool operator() (MemberListEntry& memberListEntry)
+//     {
+//         return isEntryInvalid(memberListEntry);
+//     }
+// };
 
 /**
  * FUNCTION NAME: nodeLoopOps
@@ -499,9 +512,25 @@ void MP1Node::nodeLoopOps() {
     node_heartbeat = memberNode->heartbeat;
 
     // Check if any node hasn't responded within a timeout period and then delete the nodes
-    getMemberNode()->memberList.erase(std::remove_if(memberNode->memberList.begin(), memberNode->memberList.end(), remove_entry()),
-                memberNode->memberList.end());
+    // getMemberNode()->memberList.erase(std::remove_if(memberNode->memberList.begin(), memberNode->memberList.end(), remove_entry()),
+    //             memberNode->memberList.end());
     // @TODO: does remove_if trigger destructor
+
+    memberNode->myPos = memberNode->memberList.begin();
+    while (memberNode->myPos != memberNode->memberList.end()) {
+        if(isEntryInvalid(memberNode, *memberNode->myPos)) {
+            int id = memberNode->myPos->getid();
+            short port = memberNode->myPos->getport();
+            Address address;
+            string _address = to_string(id) + ":" + to_string(port);
+            address = Address(_address);
+            log->logNodeRemove(&memberNode->addr, &address);
+            // free((MemberListEntry *)&(*memberNode->myPos));
+            memberNode->myPos = memberNode->memberList.erase(memberNode->myPos);
+        } else {
+            ++memberNode->myPos;
+        }
+    }
 
     // construct MEMBERLIST message
     int entry_num = getMemberNode()->memberList.size();

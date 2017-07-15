@@ -83,6 +83,9 @@ public:
 	void handleJOINREP(void *env, char *data, int size);
 	void handleHEARTBEAT(void *env, char *data, int size);
 	void handleMEMBERLIST(void *env, char *data, int size);
+
+	void logNodeAddWrapper(Member *memberNode, int id, short port);
+	void updateEntry(Member *memberNode, int id, short port, long heartbeat);
 };
 
 #endif /* _MP1NODE_H_ */
