@@ -28,6 +28,9 @@ MP1Node::MP1Node(Member *member, Params *params, EmulNet *emul, Log *log, Addres
 	this->log = log;
 	this->par = params;
 	this->memberNode->addr = *address;
+
+    this->tobedeleted = new map<int, int>();
+    this->tobedeleted->clear();
 }
 
 /**
@@ -163,6 +166,14 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
         free(msg);
     }
 
+    // add self to memberlist
+    int id = 0;
+    short port;
+    memcpy(&id, &(memberNode->addr.addr[0]), sizeof(int));
+    memcpy(&port, &(memberNode->addr.addr[4]), sizeof(short));
+    MemberListEntry *newEntry = new MemberListEntry(id, port, 0, par->getcurrtime());
+    memberNode->memberList.push_back(*newEntry);
+
     return 1;
 
 }
@@ -247,9 +258,8 @@ bool MP1Node::recvCallBack(void *env, char *data, int size) {
     // 2. when cluster member receives JOINREP, add the cluster member list
 
     // for membership:
-    // two message types: HEARTBEAT, MEMBERLIST
-    // 1. when receive HEARTBEAT, update member list entry for that node
-    // 3. when receive MEMBERLIST, update you own member list accordingly
+    // one message type: MEMBERLIST
+    // 1. when receive MEMBERLIST, update you own member list accordingly
 
     MsgTypes msgType = ((MessageHdr *)data)->msgType;
 
@@ -260,9 +270,6 @@ bool MP1Node::recvCallBack(void *env, char *data, int size) {
         case JOINREP:
             handleJOINREP(env, data, size);
             break;
-        case HEARTBEAT:
-            handleHEARTBEAT(env, data, size);
-            break;
         case MEMBERLIST:
             handleMEMBERLIST(env, data, size);
             break;
@@ -271,10 +278,9 @@ bool MP1Node::recvCallBack(void *env, char *data, int size) {
     }
 
     return false;
-
 }
 
-// #define DEBUG_JOINREQ
+#define DEBUG_JOINREQ
 
 void MP1Node::handleJOINREQ(void *env, char *data, int size) {
     #ifdef DEBUG_JOINREQ
@@ -299,7 +305,8 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
         cout << "before adding member list entry, there are " << memberNode->memberList.size() << " entries" << endl;
     #endif
 
-    MemberListEntry *newEntry = new MemberListEntry(id, port);
+    // newly added node have 0 heartbeat
+    MemberListEntry *newEntry = new MemberListEntry(id, port, 0, par->getcurrtime());
     memberNode->memberList.push_back(*newEntry);
 
     logNodeAddWrapper(memberNode, id, port);
@@ -328,6 +335,7 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
         currentOffset += sizeof(address.addr);
         memcpy((char *)(JOINREPMsg) + currentOffset, &memberListEntry.heartbeat, sizeof(long));
         currentOffset += sizeof(long);
+        // only send heartbeat, timestamp is set by receivers with par->getcurrtime()
     }
 
     #ifdef DEBUG_JOINREQ
@@ -340,7 +348,7 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
     emulNet->ENsend(&memberNode->addr, &address, (char *)JOINREPMsg, JOINREPMsgSize);
 }
 
-// #define DEBUG_JOINREQ
+#define DEBUG_JOINREQ
 
 void MP1Node::handleJOINREP(void *env, char *data, int size) {
     #ifdef DEBUG_JOINREQ
@@ -366,8 +374,8 @@ void MP1Node::handleJOINREP(void *env, char *data, int size) {
         // heartbeat
         memcpy(&heartbeat, (char *)(msg)+currentOffset, 8);
         currentOffset += 8;
-        // @TODO: timestamp may be needed
-        MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, 0);
+
+        MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, par->getcurrtime());
         memberNode->memberList.push_back(*newEntry);
 
         logNodeAddWrapper(memberNode, id, port);
@@ -377,13 +385,23 @@ void MP1Node::handleJOINREP(void *env, char *data, int size) {
 }
 
 void MP1Node::updateEntry(Member *memberNode, int id, short port, long heartbeat) {
+    // if this node (with id) is already in tobedeleted list, just ignore it
+    auto alreadyintobedeletedlist = tobedeleted->count(id);
+    if (alreadyintobedeletedlist != 0) {
+        // already in tobedeleted list, ignore the update
+        return;
+    }
+
+    // if it is not to be deleted, then update normally
     bool found = false;
     for (MemberListEntry memberListEntry: memberNode->memberList) {
 
         if (memberListEntry.getid() == id && memberListEntry.getport() == port) {
             found = true;
+            // the incoming heartbeat is more latest
             if (memberListEntry.getheartbeat() < heartbeat) {
                 memberListEntry.setheartbeat(heartbeat);
+                memberListEntry.settimestamp(par->getcurrtime());
             }
             break;
         } else {
@@ -391,52 +409,79 @@ void MP1Node::updateEntry(Member *memberNode, int id, short port, long heartbeat
         }
     }
     if (!found) {
-        // @TODO: timestamp may be needed
-        MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, 0);
+        MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, par->getcurrtime());
         memberNode->memberList.push_back(*newEntry);
 
         logNodeAddWrapper(memberNode, id, port);
     }
 }
 
+// void MP1Node::updateEntryHEARTBEAT(Member *memberNode, int id, short port, long heartbeat) {
+//     // if the node marks another node as failed and already added it to tobedeleted dict
+//     // and after some time it receives heartbeat from that node, then it should remove the
+//     // node from the tobedeleted dict and put it back to the memberList
+
+//     bool found = false;
+//     for (MemberListEntry memberListEntry: memberNode->memberList) {
+
+//         if (memberListEntry.getid() == id && memberListEntry.getport() == port) {
+//             found = true;
+//             if (memberListEntry.getheartbeat() < heartbeat) {
+//                 memberListEntry.setheartbeat(heartbeat);
+//             }
+//             break;
+//         } else {
+//             continue;
+//         }
+//     }
+//     if (!found) {
+//         // @TODO: timestamp may be needed
+//         MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, 0);
+//         memberNode->memberList.push_back(*newEntry);
+
+//         logNodeAddWrapper(memberNode, id, port);
+//     }
+// }
+
 // #define DEBUG_HEARTBEAT
 
-void MP1Node::handleHEARTBEAT(void *env, char *data, int size) {
-    #ifdef DEBUG_HEARTBEAT
-        cout << "just got a heartbeat" << endl;
-    #endif
+// void MP1Node::handleHEARTBEAT(void *env, char *data, int size) {
+//     #ifdef DEBUG_HEARTBEAT
+//         cout << "just got a heartbeat" << endl;
+//     #endif
 
-    // use the addr and heartbeat to update the entry
-    char addr[6];
-    MessageHdr *msg = (MessageHdr *)data;
-    memcpy(&addr, (char *)(msg)+4, 6);
-    int id = 0;
-    short port;
-    memcpy(&id, &addr[0], sizeof(int));
-    memcpy(&port, &addr[4], sizeof(short));
-    long heartbeat = 0;
-    memcpy(&heartbeat, (char *)(msg)+10, 8);
+//     // use the addr and heartbeat to update the entry
+//     char addr[6];
+//     MessageHdr *msg = (MessageHdr *)data;
+//     memcpy(&addr, (char *)(msg)+4, 6);
+//     int id = 0;
+//     short port;
+//     memcpy(&id, &addr[0], sizeof(int));
+//     memcpy(&port, &addr[4], sizeof(short));
+//     long heartbeat = 0;
+//     memcpy(&heartbeat, (char *)(msg)+10, 8);
 
-    updateEntry(memberNode, id, port, heartbeat);
-}
+//     updateEntryHEARTBEAT(memberNode, id, port, heartbeat);
+// }
 
-// #define DEBUG_MEMBERLIST
+#define DEBUG_MEMBERLIST
 
 void MP1Node::handleMEMBERLIST(void *env, char *data, int size) {
-    #ifdef DEBUG_MEMBERLIST
-        cout << "just got a member list" << endl;
-    #endif
+    // #ifdef DEBUG_MEMBERLIST
+    //     cout << "just got a member list" << endl;
+    // #endif
 
-    // for every addr and heartbeat in the incoming member list, do the same as handleHEARTBEATs
     int entry_num = (size - 4)/ (6+8);
     int currentOffset = 4;
     char addr[6];
     int id = 0;
     short port;
     long heartbeat = 0;
+
+    // for every addr and heartbeat in the incoming member list
     for (int i = 0; i < entry_num; ++i)
     {
-        // addr
+        // extract id and port
         MessageHdr *msg = (MessageHdr *)data;
         memcpy(&addr, (char *)(msg)+currentOffset, 6);
         currentOffset += 6;
@@ -451,30 +496,38 @@ void MP1Node::handleMEMBERLIST(void *env, char *data, int size) {
     }
 }
 
-#define HEARTBEAT_THRESHOLD 3
-
-// this is a single threaded application
-
-// check if the heartbeat is outdated
+// check if the timestamp is outdated
 bool isEntryInvalid(Member *memberNode, MemberListEntry& memberListEntry) {
-    // can't be based on
-    long entry_heartbeat = memberListEntry.getheartbeat();
-    // some threahold
-    if (memberNode->heartbeat - entry_heartbeat > HEARTBEAT_THRESHOLD) {
+    long entry_timestamp = memberListEntry.gettimestamp();
+    long node_timestamp = memberNode->memberList[0].gettimestamp();
+
+    if (node_timestamp - entry_timestamp > TFAIL) {
         return true;
     }
     return false;
 }
 
-// struct remove_entry : public std::unary_function<MemberListEntry&, bool> {
-//     bool operator() (MemberListEntry& memberListEntry)
-//     {
-//         return isEntryInvalid(memberListEntry);
-//     }
-// };
+void MP1Node::updateToBeDeletedList() {
+    // cout << "enter updateToBeDeletedList" << endl;
+    std::map<int, int>::iterator it = tobedeleted->begin();
+    // cout << "the size of tobedeleted is " << tobedeleted->size();
+    while(it != tobedeleted->end()) {
+        // cout << it->second << " in updateToBeDeletedList" << endl;
+        it->second = it->second + 1;
+        if (it->second >= TREMOVE) {
+            // log the removal
+            Address address;
+            string _address = to_string(it->first) + ":" + to_string(0);
+            address = Address(_address);
+            log->logNodeRemove(&memberNode->addr, &address);
 
-// this is actually essential because without it, member node can get information from introducer
-#define SEND_MEMBERLIST
+            // remove from to-be-deleted map; can be re-added by membership protocol now
+            it = tobedeleted->erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
 
 /**
  * FUNCTION NAME: nodeLoopOps
@@ -486,13 +539,17 @@ bool isEntryInvalid(Member *memberNode, MemberListEntry& memberListEntry) {
 void MP1Node::nodeLoopOps() {
 
     // first implement all to all heartbeat
-    // 0. update self heartbeat
+    // 0. update self heartbeat and tiemstamp
     // 1. Check if any node hasn't responded within a timeout period and then delete the nodes
-    // 2. send heartbeats to all other members (HEARTBEAT)
-    // 3. Propagate your membership list to every other member (MEMBERLIST)
+    // 2. Propagate your membership list to every other member (MEMBERLIST)
 
     // update self heartbeat
     memberNode->heartbeat++;
+
+    // update the entry of self in self memberlist
+    // memberNode->memberList[0] is self entry because it is done in introduceSelfToGroup
+    memberNode->memberList[0].setheartbeat(memberNode->heartbeat);
+    memberNode->memberList[0].settimestamp(par->getcurrtime());
 
     memberNode->myPos = memberNode->memberList.begin();
     while (memberNode->myPos != memberNode->memberList.end()) {
@@ -505,13 +562,18 @@ void MP1Node::nodeLoopOps() {
 
             // @TODO: instead of deleting right away, add it to to-be-deleted dict
             // to-be-deleted dict: node id: times
-            log->logNodeRemove(&memberNode->addr, &address);
+            // log->logNodeRemove(&memberNode->addr, &address);
             // free((MemberListEntry *)&(*memberNode->myPos));
+            // cout << "the size of tobedeleted is " << tobedeleted->size();
+            tobedeleted->insert(std::make_pair(id, 0));
+
             memberNode->myPos = memberNode->memberList.erase(memberNode->myPos);
         } else {
             ++memberNode->myPos;
         }
     }
+
+    updateToBeDeletedList();
 
     // construct MEMBERLIST message
     int entry_num = getMemberNode()->memberList.size();
@@ -524,23 +586,11 @@ void MP1Node::nodeLoopOps() {
     // for the message type offset (int)
     currentOffset += 4;
 
-    // construct HEARTBEAT message
-    MessageHdr *heartbeatMsg;
-    // 6 for char addr[6]
-    size_t heartbeatMsgSize = sizeof(MessageHdr) + 6 + sizeof(long);
-    heartbeatMsg = (MessageHdr *) malloc(heartbeatMsgSize * sizeof(char));
-
-    heartbeatMsg->msgType = HEARTBEAT;
-    memcpy((char *)(heartbeatMsg+1), &memberNode->addr.addr, sizeof(memberNode->addr.addr));
-    memcpy((char *)(heartbeatMsg+1) + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
-
     // send / construct two kinds of messages
     for (MemberListEntry memberListEntry: memberNode->memberList) {
         Address address;
-        // send HEARTBEAT to all other members
         string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
         address = Address(_address);
-        emulNet->ENsend(&memberNode->addr, &address, (char *)heartbeatMsg, heartbeatMsgSize);
 
         // add to MEMBERLIST
         memcpy((char *)(memberListMsg) + currentOffset, &address.addr, sizeof(address.addr));
@@ -548,19 +598,16 @@ void MP1Node::nodeLoopOps() {
         memcpy((char *)(memberListMsg) + currentOffset, &memberListEntry.heartbeat, sizeof(long));
         currentOffset += sizeof(long);
     }
-    free(heartbeatMsg);
 
     assert(currentOffset == memberListMsgSize);
 
-    #ifdef SEND_MEMBERLIST
-        // Propagate your membership list
-        for (MemberListEntry memberListEntry: memberNode->memberList) {
-            Address address;
-            string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
-            address = Address(_address);
-            emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, memberListMsgSize);
-        }
-    #endif
+    // Propagate your membership list
+    for (MemberListEntry memberListEntry: memberNode->memberList) {
+        Address address;
+        string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
+        address = Address(_address);
+        emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, memberListMsgSize);
+    }
 
     free(memberListMsg);
 

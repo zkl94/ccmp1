@@ -14,6 +14,7 @@
 #include "Member.h"
 #include "EmulNet.h"
 #include "Queue.h"
+#include <map>
 
 /**
  * Macros
@@ -31,9 +32,8 @@
 enum MsgTypes{
     JOINREQ = 0,
     JOINREP = 1,
-    HEARTBEAT = 2,
-    MEMBERLIST = 3,
-    DUMMYLASTMSGTYPE = 4
+    MEMBERLIST = 2,
+    DUMMYLASTMSGTYPE = 3
 };
 
 /**
@@ -57,6 +57,7 @@ private:
 	Params *par;
 	Member *memberNode;
 	char NULLADDR[6];
+	std::map<int, int> *tobedeleted;
 
 public:
 	MP1Node(Member *, Params *, EmulNet *, Log *, Address *);
@@ -86,6 +87,7 @@ public:
 
 	void logNodeAddWrapper(Member *memberNode, int id, short port);
 	void updateEntry(Member *memberNode, int id, short port, long heartbeat);
+	void updateToBeDeletedList();
 };
 
 #endif /* _MP1NODE_H_ */
