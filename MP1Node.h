@@ -57,9 +57,9 @@ private:
 	Params *par;
 	Member *memberNode;
 	char NULLADDR[6];
-	std::map<int, int> *tobedeleted;
 
 public:
+	std::map<int, int> *tobedeleted;
 	MP1Node(Member *, Params *, EmulNet *, Log *, Address *);
 	Member * getMemberNode() {
 		return memberNode;

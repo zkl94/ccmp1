@@ -29,8 +29,10 @@ MP1Node::MP1Node(Member *member, Params *params, EmulNet *emul, Log *log, Addres
 	this->par = params;
 	this->memberNode->addr = *address;
 
-    this->tobedeleted = new map<int, int>();
+    cout << "calling constructor for MP1Node" << endl;
+    this->tobedeleted = new std::map<int, int>;
     this->tobedeleted->clear();
+    cout << "tobedeleted size is " << this->tobedeleted->size() << endl;
 }
 
 /**
@@ -261,6 +263,8 @@ bool MP1Node::recvCallBack(void *env, char *data, int size) {
     // one message type: MEMBERLIST
     // 1. when receive MEMBERLIST, update you own member list accordingly
 
+    cout << "handling message" <<endl;
+
     MsgTypes msgType = ((MessageHdr *)data)->msgType;
 
     switch (msgType) {
@@ -274,6 +278,7 @@ bool MP1Node::recvCallBack(void *env, char *data, int size) {
             handleMEMBERLIST(env, data, size);
             break;
         default:
+            cout << "unknown message type" <<endl;
             break;
     }
 
@@ -346,6 +351,9 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
     string _address = to_string(id) + ":" + to_string(port);
     Address address = Address(_address);
     emulNet->ENsend(&memberNode->addr, &address, (char *)JOINREPMsg, JOINREPMsgSize);
+    #ifdef DEBUG_JOINREQ
+        cout << "JOINREP successfully sent" <<endl;
+    #endif
 }
 
 #define DEBUG_JOINREQ
@@ -386,7 +394,7 @@ void MP1Node::handleJOINREP(void *env, char *data, int size) {
 
 void MP1Node::updateEntry(Member *memberNode, int id, short port, long heartbeat) {
     // if this node (with id) is already in tobedeleted list, just ignore it
-    auto alreadyintobedeletedlist = tobedeleted->count(id);
+    auto alreadyintobedeletedlist = this->tobedeleted->count(id);
     if (alreadyintobedeletedlist != 0) {
         // already in tobedeleted list, ignore the update
         return;
@@ -508,11 +516,13 @@ bool isEntryInvalid(Member *memberNode, MemberListEntry& memberListEntry) {
 }
 
 void MP1Node::updateToBeDeletedList() {
-    // cout << "enter updateToBeDeletedList" << endl;
-    std::map<int, int>::iterator it = tobedeleted->begin();
-    // cout << "the size of tobedeleted is " << tobedeleted->size();
-    while(it != tobedeleted->end()) {
-        // cout << it->second << " in updateToBeDeletedList" << endl;
+    cout << "enter updateToBeDeletedList" << endl;
+    cout << "the size of tobedeleted is " << this->tobedeleted->empty();
+
+    std::map<int, int>::iterator it = this->tobedeleted->begin();
+    
+    while(it != this->tobedeleted->end()) {
+        cout << it->second << " in updateToBeDeletedList" << endl;
         it->second = it->second + 1;
         if (it->second >= TREMOVE) {
             // log the removal
@@ -522,11 +532,12 @@ void MP1Node::updateToBeDeletedList() {
             log->logNodeRemove(&memberNode->addr, &address);
 
             // remove from to-be-deleted map; can be re-added by membership protocol now
-            it = tobedeleted->erase(it);
+            it = this->tobedeleted->erase(it);
         } else {
             ++it;
         }
     }
+    cout << "out of updateToBeDeletedList" << endl;
 }
 
 /**
@@ -551,6 +562,7 @@ void MP1Node::nodeLoopOps() {
     memberNode->memberList[0].setheartbeat(memberNode->heartbeat);
     memberNode->memberList[0].settimestamp(par->getcurrtime());
 
+    cout << "before checking isEntryInvalid" <<endl;
     memberNode->myPos = memberNode->memberList.begin();
     while (memberNode->myPos != memberNode->memberList.end()) {
         if(isEntryInvalid(memberNode, *memberNode->myPos)) {
@@ -560,12 +572,14 @@ void MP1Node::nodeLoopOps() {
             string _address = to_string(id) + ":" + to_string(port);
             address = Address(_address);
 
+            cout << "found invalid entry with id " << id <<endl;
+
             // @TODO: instead of deleting right away, add it to to-be-deleted dict
             // to-be-deleted dict: node id: times
             // log->logNodeRemove(&memberNode->addr, &address);
             // free((MemberListEntry *)&(*memberNode->myPos));
             // cout << "the size of tobedeleted is " << tobedeleted->size();
-            tobedeleted->insert(std::make_pair(id, 0));
+            this->tobedeleted->insert(std::make_pair(id, 0));
 
             memberNode->myPos = memberNode->memberList.erase(memberNode->myPos);
         } else {
@@ -573,7 +587,9 @@ void MP1Node::nodeLoopOps() {
         }
     }
 
-    updateToBeDeletedList();
+    cout << "after checking isEntryInvalid" <<endl;
+
+    this->updateToBeDeletedList();
 
     // construct MEMBERLIST message
     int entry_num = getMemberNode()->memberList.size();
