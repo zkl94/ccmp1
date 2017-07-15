@@ -363,31 +363,29 @@ void MP1Node::handleJOINREP(void *env, char *data, int size) {
         cout << "just got a join response with size " << size << endl;
     #endif
 
-    // use the returned member list to initiate the member list of self
-    int entry_num = (size - 4)/ (6+8);
-    int currentOffset = 4;
-    char addr[6];
-    int id = 0;
-    short port;
-    long heartbeat = 0;
-    for (int i = 0; i < entry_num; ++i)
-    {
-        // addr
-        MessageHdr *msg = (MessageHdr *)data;
-        memcpy(&addr, (char *)(msg)+currentOffset, 6);
-        currentOffset += 6;
-        memcpy(&id, &addr[0], sizeof(int));
-        memcpy(&port, &addr[4], sizeof(short));
+    // // use the returned member list to initiate the member list of self
+    // int entry_num = (size - 4)/ (6+8);
+    // int currentOffset = 4;
+    // char addr[6];
+    // int id = 0;
+    // short port;
+    // long heartbeat = 0;
+    // for (int i = 0; i < entry_num; ++i)
+    // {
+    //     // addr
+    //     MessageHdr *msg = (MessageHdr *)data;
+    //     memcpy(&addr, (char *)(msg)+currentOffset, 6);
+    //     currentOffset += 6;
+    //     memcpy(&id, &addr[0], sizeof(int));
+    //     memcpy(&port, &addr[4], sizeof(short));
         
-        // heartbeat
-        memcpy(&heartbeat, (char *)(msg)+currentOffset, 8);
-        currentOffset += 8;
+    //     // heartbeat
+    //     memcpy(&heartbeat, (char *)(msg)+currentOffset, 8);
+    //     currentOffset += 8;
 
-        MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, par->getcurrtime());
-        memberNode->memberList.push_back(*newEntry);
-
-        logNodeAddWrapper(memberNode, id, port);
-    }
+    //     updateEntry(memberNode, id, port, heartbeat);
+    // }
+    handleMEMBERLIST(env, data, size);
 
     memberNode->inGroup = true;
 }
