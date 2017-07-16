@@ -19,7 +19,7 @@
 /**
  * Macros
  */
-#define TREMOVE 20
+#define TREMOVE 10
 #define TFAIL 5
 
 /*
@@ -87,7 +87,7 @@ public:
 
 	void logNodeAddWrapper(Member *memberNode, int id, short port);
 	void updateEntry(Member *memberNode, int id, short port, long heartbeat);
-	void updateToBeDeletedList();
+	void updateToBeDeletedMap();
 };
 
 #endif /* _MP1NODE_H_ */

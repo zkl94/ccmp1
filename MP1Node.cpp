@@ -2,7 +2,7 @@
  * FILE NAME: MP1Node.cpp
  *
  * DESCRIPTION: Membership protocol run by this Node.
- * 				Definition of MP1Node class functions.
+ *              Definition of MP1Node class functions.
  **********************************/
 
 #include "MP1Node.h"
@@ -20,19 +20,17 @@
  * is necessary for your logic to work
  */
 MP1Node::MP1Node(Member *member, Params *params, EmulNet *emul, Log *log, Address *address) {
-	for( int i = 0; i < 6; i++ ) {
-		NULLADDR[i] = 0;
-	}
-	this->memberNode = member;
-	this->emulNet = emul;
-	this->log = log;
-	this->par = params;
-	this->memberNode->addr = *address;
+    for( int i = 0; i < 6; i++ ) {
+        NULLADDR[i] = 0;
+    }
+    this->memberNode = member;
+    this->emulNet = emul;
+    this->log = log;
+    this->par = params;
+    this->memberNode->addr = *address;
 
-    cout << "calling constructor for MP1Node" << endl;
     this->tobedeleted = new std::map<int, int>;
     this->tobedeleted->clear();
-    cout << "tobedeleted size is " << this->tobedeleted->size() << endl;
 }
 
 /**
@@ -44,14 +42,14 @@ MP1Node::~MP1Node() {}
  * FUNCTION NAME: recvLoop
  *
  * DESCRIPTION: This function receives message from the network and pushes into the queue
- * 				This function is called by a node to receive messages currently waiting for it
+ *              This function is called by a node to receive messages currently waiting for it
  */
 int MP1Node::recvLoop() {
     if ( memberNode->bFailed ) {
-    	return false;
+        return false;
     }
     else {
-    	return emulNet->ENrecv(&(memberNode->addr), enqueueWrapper, NULL, 1, &(memberNode->mp1q));
+        return emulNet->ENrecv(&(memberNode->addr), enqueueWrapper, NULL, 1, &(memberNode->mp1q));
     }
 }
 
@@ -61,16 +59,16 @@ int MP1Node::recvLoop() {
  * DESCRIPTION: Enqueue the message from Emulnet into the queue
  */
 int MP1Node::enqueueWrapper(void *env, char *buff, int size) {
-	Queue q;
-	return q.enqueue((queue<q_elt> *)env, (void *)buff, size);
+    Queue q;
+    return q.enqueue((queue<q_elt> *)env, (void *)buff, size);
 }
 
 /**
  * FUNCTION NAME: nodeStart
  *
  * DESCRIPTION: This function bootstraps the node
- * 				All initializations routines for a member.
- * 				Called by the application layer.
+ *              All initializations routines for a member.
+ *              Called by the application layer.
  */
 void MP1Node::nodeStart(char *servaddrstr, short servport) {
     // join address is the address of the introducer
@@ -104,22 +102,22 @@ void MP1Node::nodeStart(char *servaddrstr, short servport) {
  * DESCRIPTION: Find out who I am and start up
  */
 int MP1Node::initThisNode(Address *my_addr) {
-	/*
-	 * This function is partially implemented and may require changes
-	 */
-	// int id = *(int*)(&my_addr->addr);
-	// int port = *(short*)(&my_addr->addr[4]);
+    /*
+     * This function is partially implemented and may require changes
+     */
+    // int id = *(int*)(&my_addr->addr);
+    // int port = *(short*)(&my_addr->addr[4]);
 
     // cout << "initing node" << endl;
 
-	memberNode->bFailed = false;
-	memberNode->inited = true;
-	memberNode->inGroup = false;
+    memberNode->bFailed = false;
+    memberNode->inited = true;
+    memberNode->inGroup = false;
     // node is up!
-	memberNode->nnb = 0;
-	memberNode->heartbeat = 0;
-	memberNode->pingCounter = TFAIL;
-	memberNode->timeOutCounter = -1;
+    memberNode->nnb = 0;
+    memberNode->heartbeat = 0;
+    memberNode->pingCounter = TFAIL;
+    memberNode->timeOutCounter = -1;
     initMemberListTable(memberNode);
 
     return 0;
@@ -131,7 +129,7 @@ int MP1Node::initThisNode(Address *my_addr) {
  * DESCRIPTION: Join the distributed system
  */
 int MP1Node::introduceSelfToGroup(Address *joinaddr) {
-	MessageHdr *msg;
+    MessageHdr *msg;
 #ifdef DEBUGLOG
     static char s[1024];
 #endif
@@ -197,11 +195,11 @@ int MP1Node::finishUpThisNode(){
  * FUNCTION NAME: nodeLoop
  *
  * DESCRIPTION: Executed periodically at each member
- * 				Check your messages in queue and perform membership protocol duties
+ *              Check your messages in queue and perform membership protocol duties
  */
 void MP1Node::nodeLoop() {
     if (memberNode->bFailed) {
-    	return;
+        return;
     }
 
     // Check my messages
@@ -209,7 +207,7 @@ void MP1Node::nodeLoop() {
 
     // Wait until you're in the group...
     if( !memberNode->inGroup ) {
-    	return;
+        return;
     }
 
     // ...then jump in and share your responsibilites!
@@ -229,10 +227,10 @@ void MP1Node::checkMessages() {
 
     // Pop waiting messages from memberNode's mp1q
     while ( !memberNode->mp1q.empty() ) {
-    	ptr = memberNode->mp1q.front().elt;
-    	size = memberNode->mp1q.front().size;
-    	memberNode->mp1q.pop();
-    	recvCallBack((void *)memberNode, (char *)ptr, size);
+        ptr = memberNode->mp1q.front().elt;
+        size = memberNode->mp1q.front().size;
+        memberNode->mp1q.pop();
+        recvCallBack((void *)memberNode, (char *)ptr, size);
     }
     return;
 }
@@ -250,9 +248,9 @@ void MP1Node::logNodeAddWrapper(Member *memberNode, int id, short port) {
  * DESCRIPTION: Message handler for different message types
  */
 bool MP1Node::recvCallBack(void *env, char *data, int size) {
-	/*
-	 * Your code goes here
-	 */
+    /*
+     * Your code goes here
+     */
 
     // for introduction:
     // two message types: JOINREQ, JOINREP
@@ -262,8 +260,6 @@ bool MP1Node::recvCallBack(void *env, char *data, int size) {
     // for membership:
     // one message type: MEMBERLIST
     // 1. when receive MEMBERLIST, update you own member list accordingly
-
-    cout << "handling message" <<endl;
 
     MsgTypes msgType = ((MessageHdr *)data)->msgType;
 
@@ -324,6 +320,7 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
     int entry_num = memberNode->memberList.size();
     int currentOffset = 0;
     // 6 for char addr[6]
+    // allocate maximum space possibly needed
     size_t JOINREPMsgSize = sizeof(MessageHdr) + (6 + sizeof(long)) * entry_num;
     MessageHdr *JOINREPMsg;
     JOINREPMsg = (MessageHdr *) malloc(JOINREPMsgSize * sizeof(char));
@@ -332,6 +329,11 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
     currentOffset += 4;
 
     for (MemberListEntry memberListEntry: memberNode->memberList) {
+        // if it is to be deleted, don't add it to member list messages
+        if (this->tobedeleted->count(memberListEntry.getid()) != 0) {
+            continue;
+        }
+
         Address address;
         string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
         address = Address(_address);
@@ -346,11 +348,12 @@ void MP1Node::handleJOINREQ(void *env, char *data, int size) {
     #ifdef DEBUG_JOINREQ
         cout << "currentOffset = " << currentOffset << " JOINREPMsgSize = " << JOINREPMsgSize << endl;
     #endif
-    assert(currentOffset == JOINREPMsgSize);
+
+    // assert(currentOffset == (int)JOINREPMsgSize);
 
     string _address = to_string(id) + ":" + to_string(port);
     Address address = Address(_address);
-    emulNet->ENsend(&memberNode->addr, &address, (char *)JOINREPMsg, JOINREPMsgSize);
+    emulNet->ENsend(&memberNode->addr, &address, (char *)JOINREPMsg, currentOffset);
     #ifdef DEBUG_JOINREQ
         cout << "JOINREP successfully sent" <<endl;
     #endif
@@ -391,29 +394,29 @@ void MP1Node::handleJOINREP(void *env, char *data, int size) {
 }
 
 void MP1Node::updateEntry(Member *memberNode, int id, short port, long heartbeat) {
-    // if this node (with id) is already in tobedeleted list, just ignore it
+    // if this node (with id) is already in to be deleted map, just ignore it
     auto alreadyintobedeletedlist = this->tobedeleted->count(id);
     if (alreadyintobedeletedlist != 0) {
-        // already in tobedeleted list, ignore the update
+        // already in to be deleted map
+        cout << "already in tobedeleted map, ignore the update" <<endl;
         return;
     }
 
-    // if it is not to be deleted, then update normally
+    // if it is not to be deleted, then update/insert normally
     bool found = false;
     for (MemberListEntry memberListEntry: memberNode->memberList) {
-
         if (memberListEntry.getid() == id && memberListEntry.getport() == port) {
             found = true;
             // the incoming heartbeat is more latest
             if (memberListEntry.getheartbeat() < heartbeat) {
+                cout << "doing heartbeat update for " << id <<endl;
                 memberListEntry.setheartbeat(heartbeat);
                 memberListEntry.settimestamp(par->getcurrtime());
             }
             break;
-        } else {
-            continue;
         }
     }
+
     if (!found) {
         MemberListEntry *newEntry = new MemberListEntry(id, port, heartbeat, par->getcurrtime());
         memberNode->memberList.push_back(*newEntry);
@@ -473,9 +476,9 @@ void MP1Node::updateEntry(Member *memberNode, int id, short port, long heartbeat
 #define DEBUG_MEMBERLIST
 
 void MP1Node::handleMEMBERLIST(void *env, char *data, int size) {
-    // #ifdef DEBUG_MEMBERLIST
-    //     cout << "just got a member list" << endl;
-    // #endif
+    #ifdef DEBUG_MEMBERLIST
+        cout << "just got a member list" << endl;
+    #endif
 
     int entry_num = (size - 4)/ (6+8);
     int currentOffset = 4;
@@ -484,11 +487,30 @@ void MP1Node::handleMEMBERLIST(void *env, char *data, int size) {
     short port;
     long heartbeat = 0;
 
+    MessageHdr *msg = (MessageHdr *)data;
+
+    // if, during the process of to be deleted, a heartbeat from that node is received,
+    // the node entry should be removed from to be deleted map and member list entry
+    // should be re-activated
+    // how to tell: the first entry in message is the node's source
+    memcpy(&addr, (char *)(msg)+currentOffset, 6);
+    memcpy(&id, &addr[0], sizeof(int));
+    if (this->tobedeleted->count(id) != 0) {
+        std::map<int, int>::iterator it = this->tobedeleted->begin();
+    
+        while(it != this->tobedeleted->end()) {
+            if (it->first == id) {
+                this->tobedeleted->erase(it);
+                break;
+            }
+            ++it;
+        }
+    } // then updateEntry will do the normal update
+
     // for every addr and heartbeat in the incoming member list
     for (int i = 0; i < entry_num; ++i)
     {
         // extract id and port
-        MessageHdr *msg = (MessageHdr *)data;
         memcpy(&addr, (char *)(msg)+currentOffset, 6);
         currentOffset += 6;
         memcpy(&id, &addr[0], sizeof(int));
@@ -513,14 +535,14 @@ bool isEntryInvalid(Member *memberNode, MemberListEntry& memberListEntry) {
     return false;
 }
 
-void MP1Node::updateToBeDeletedList() {
-    cout << "enter updateToBeDeletedList" << endl;
-    cout << "the size of tobedeleted is " << this->tobedeleted->empty();
+void MP1Node::updateToBeDeletedMap() {
+    // cout << "enter updateToBeDeletedList" << endl;
+    // cout << "the size of tobedeleted is " << this->tobedeleted->size() << endl;
 
     std::map<int, int>::iterator it = this->tobedeleted->begin();
     
     while(it != this->tobedeleted->end()) {
-        cout << it->second << " in updateToBeDeletedList" << endl;
+        // cout << it->second << " in updateToBeDeletedList" << endl;
         it->second = it->second + 1;
         if (it->second >= TREMOVE) {
             // log the removal
@@ -529,21 +551,37 @@ void MP1Node::updateToBeDeletedList() {
             address = Address(_address);
             log->logNodeRemove(&memberNode->addr, &address);
 
+            // remove from member list
+            bool found = false;
+            memberNode->myPos = memberNode->memberList.begin();
+            while (memberNode->myPos != memberNode->memberList.end()) {
+                if ((*memberNode->myPos).getid() == it->first) {
+                    // found it
+                    found = true;
+                    memberNode->myPos = memberNode->memberList.erase(memberNode->myPos);
+                    break;
+                }
+                ++memberNode->myPos;
+            }
+            if (!found) {
+                cout << "the should-be-deleted entry is not found in member list; sth goes wrong" << endl;
+            }
+
             // remove from to-be-deleted map; can be re-added by membership protocol now
             it = this->tobedeleted->erase(it);
         } else {
             ++it;
         }
     }
-    cout << "out of updateToBeDeletedList" << endl;
+    // cout << "out of updateToBeDeletedList" << endl;
 }
 
 /**
  * FUNCTION NAME: nodeLoopOps
  *
  * DESCRIPTION: Check if any node hasn't responded within a timeout period and then delete
- * 				the nodes
- * 				Propagate your membership list
+ *              the nodes
+ *              Propagate your membership list
  */
 void MP1Node::nodeLoopOps() {
 
@@ -560,7 +598,7 @@ void MP1Node::nodeLoopOps() {
     memberNode->memberList[0].setheartbeat(memberNode->heartbeat);
     memberNode->memberList[0].settimestamp(par->getcurrtime());
 
-    cout << "before checking isEntryInvalid" <<endl;
+    // cout << "before checking isEntryInvalid" <<endl;
     memberNode->myPos = memberNode->memberList.begin();
     while (memberNode->myPos != memberNode->memberList.end()) {
         if(isEntryInvalid(memberNode, *memberNode->myPos)) {
@@ -577,22 +615,25 @@ void MP1Node::nodeLoopOps() {
             // log->logNodeRemove(&memberNode->addr, &address);
             // free((MemberListEntry *)&(*memberNode->myPos));
             // cout << "the size of tobedeleted is " << tobedeleted->size();
-            this->tobedeleted->insert(std::make_pair(id, 0));
+            if (this->tobedeleted->count(id) == 0) {
+                // may have already added to tobedeleted map
+                this->tobedeleted->insert(std::make_pair(id, 0));
+            }
 
-            memberNode->myPos = memberNode->memberList.erase(memberNode->myPos);
-        } else {
-            ++memberNode->myPos;
+            // can't remove it at once although we are using tobedeleted map
+            // because we still have to send broadcast to it
+            // memberNode->myPos = memberNode->memberList.erase(memberNode->myPos);
         }
+        ++memberNode->myPos;
     }
 
-    cout << "after checking isEntryInvalid" <<endl;
-
-    this->updateToBeDeletedList();
+    this->updateToBeDeletedMap();
 
     // construct MEMBERLIST message
-    int entry_num = getMemberNode()->memberList.size();
+    int entry_num = memberNode->memberList.size();
     int currentOffset = 0; 
     // 6 for char addr[6]
+    // allocate maximum space possibly needed
     size_t memberListMsgSize = sizeof(MessageHdr) + (6 + sizeof(long)) * entry_num;
     MessageHdr *memberListMsg;
     memberListMsg = (MessageHdr *) malloc(memberListMsgSize * sizeof(char));
@@ -602,6 +643,11 @@ void MP1Node::nodeLoopOps() {
 
     // send / construct two kinds of messages
     for (MemberListEntry memberListEntry: memberNode->memberList) {
+        // if it is to be deleted, don't add it to member list messages
+        if (this->tobedeleted->count(memberListEntry.getid()) != 0) {
+            continue;
+        }
+
         Address address;
         string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
         address = Address(_address);
@@ -613,15 +659,19 @@ void MP1Node::nodeLoopOps() {
         currentOffset += sizeof(long);
     }
 
-    assert(currentOffset == memberListMsgSize);
+    // assert(currentOffset == (int)memberListMsgSize);
 
-    // Propagate your membership list
+    // Propagate your membership list; it is sent to even nodes (entries) to be deleted
     for (MemberListEntry memberListEntry: memberNode->memberList) {
         Address address;
         string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
         address = Address(_address);
-        emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, memberListMsgSize);
+        emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, currentOffset);
     }
+
+    #ifdef DEBUGLOG
+        log->LOG(&memberNode->addr, "sent member list message");
+    #endif
 
     free(memberListMsg);
 
@@ -634,7 +684,7 @@ void MP1Node::nodeLoopOps() {
  * DESCRIPTION: Function checks if the address is NULL
  */
 int MP1Node::isNullAddress(Address *addr) {
-	return (memcmp(addr->addr, NULLADDR, 6) == 0 ? 1 : 0);
+    return (memcmp(addr->addr, NULLADDR, 6) == 0 ? 1 : 0);
 }
 
 /**
@@ -659,7 +709,7 @@ Address MP1Node::getJoinAddress() {
  * DESCRIPTION: Initialize the membership list
  */
 void MP1Node::initMemberListTable(Member *memberNode) {
-	memberNode->memberList.clear();
+    memberNode->memberList.clear();
 }
 
 /**
