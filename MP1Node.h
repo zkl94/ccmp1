@@ -21,6 +21,7 @@
  */
 #define TREMOVE 10
 #define TFAIL 5
+#define BROADCAST_INTERVAL 4
 
 /*
  * Note: You can change/add any functions in MP1Node.{h,cpp}
@@ -57,6 +58,7 @@ private:
 	Params *par;
 	Member *memberNode;
 	char NULLADDR[6];
+	int broadcast;
 
 public:
 	std::map<int, int> *tobedeleted;

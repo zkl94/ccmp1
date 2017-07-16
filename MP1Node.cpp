@@ -1,18 +1,13 @@
 /**********************************
  * FILE NAME: MP1Node.cpp
  *
- * DESCRIPTION: Membership protocol run by this Node.
- *              Definition of MP1Node class functions.
+ * DESCRIPTION: THIS IS GOSSIP STYLE MEMBERSHIP
+ * LINK: https://www.cs.cornell.edu/home/rvr/papers/GossipFD.pdf
  **********************************/
 
 #include "MP1Node.h"
-#include <algorithm> // for remove_if
-#include <functional> // for unary_function
 #include <cassert>
-
-/*
- * Note: You can change/add any functions in MP1Node.{h,cpp}
- */
+#include <cstdlib>
 
 /**
  * Overloaded Constructor of the MP1Node class
@@ -28,9 +23,8 @@ MP1Node::MP1Node(Member *member, Params *params, EmulNet *emul, Log *log, Addres
     this->log = log;
     this->par = params;
     this->memberNode->addr = *address;
-
+    this->broadcast = 0;
     this->tobedeleted = new std::map<int, int>;
-    this->tobedeleted->clear();
 }
 
 /**
@@ -495,7 +489,6 @@ void MP1Node::updateToBeDeletedMap() {
  */
 void MP1Node::nodeLoopOps() {
 
-    // THIS IS ACTUALLY A COMBINATION OF GOSSIP STYLE AND ALL TO ALL STYLE
     // 0. update self heartbeat and tiemstamp
     // 1. Check if any node hasn't responded within a timeout period and then delete the nodes
     // 2. Propagate your membership list to every other member (MEMBERLIST)
@@ -560,10 +553,24 @@ void MP1Node::nodeLoopOps() {
         currentOffset += sizeof(long);
     }
 
+
     // Propagate your membership list; it is sent to even nodes (entries) to be deleted
-    for (MemberListEntry memberListEntry: memberNode->memberList) {
+    broadcast++;
+    // decide whether broadcast or unicast
+    if (broadcast >= BROADCAST_INTERVAL) {
+        // broadcast
+        for (MemberListEntry memberListEntry: memberNode->memberList) {
+            Address address;
+            string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
+            address = Address(_address);
+            emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, currentOffset);
+        }
+    } else {
+        // unicast
+        int member_num = memberNode->memberList.size();
+        int index = rand() % member_num;
         Address address;
-        string _address = to_string(memberListEntry.getid()) + ":" + to_string(memberListEntry.getport());
+        string _address = to_string(memberNode->memberList.at(index).getid()) + ":" + to_string(memberNode->memberList.at(index).getport());
         address = Address(_address);
         emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, currentOffset);
     }
