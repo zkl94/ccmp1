@@ -565,6 +565,7 @@ void MP1Node::nodeLoopOps() {
             address = Address(_address);
             emulNet->ENsend(&memberNode->addr, &address, (char *)memberListMsg, currentOffset);
         }
+        broadcast = 0;
     } else {
         // unicast
         int member_num = memberNode->memberList.size();
